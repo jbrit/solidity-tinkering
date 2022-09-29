@@ -1,21 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.0;
 
-import "./Ownable.sol";
-
-contract Constants {
-    uint256 public tradeFlag = 1;
-    uint256 public basicFlag = 0;
-    uint256 public dividendFlag = 1;
-}
-
-contract GasContract is Ownable, Constants {
+contract GasContract {
     uint256 public totalSupply = 0; // cannot be updated
     uint256 public paymentCounter = 0;
     mapping(address => uint256) public balances;
-    uint256 public tradePercent = 12;
+    uint256 constant tradePercent = 12;
     address public contractOwner;
-    uint256 public tradeMode = 0;
     mapping(address => Payment[]) public payments;
     mapping(address => uint256) public whitelist;
     address[5] public administrators;
@@ -93,7 +84,7 @@ contract GasContract is Ownable, Constants {
         _;
     }
 
-    event supplyChanged(address indexed, uint256 indexed);
+    event supplyChanged(address indexed, uint256);
     event Transfer(address recipient, uint256 amount);
     event PaymentUpdated(
         address admin,
@@ -125,8 +116,7 @@ contract GasContract is Ownable, Constants {
     }
 
     function getPaymentHistory()
-        public
-        payable
+        external
         returns (History[] memory paymentHistory_)
     {
         return paymentHistory;
@@ -142,39 +132,17 @@ contract GasContract is Ownable, Constants {
         return admin;
     }
 
-    function balanceOf(address _user) public view returns (uint256 balance_) {
+    function balanceOf(address _user) external view returns (uint256 balance_) {
         uint256 balance = balances[_user];
         return balance;
     }
 
-    function getTradingMode() public view returns (bool mode_) {
-        bool mode = false;
-        if (tradeFlag == 1 || dividendFlag == 1) {
-            mode = true;
-        } else {
-            mode = false;
-        }
-        return mode;
-    }
-
-    function addHistory(address _updateAddress, bool _tradeMode)
-        public
-        returns (bool status_, bool tradeMode_)
-    {
-        History memory history;
-        history.blockNumber = block.number;
-        history.lastUpdate = block.timestamp;
-        history.updatedBy = _updateAddress;
-        paymentHistory.push(history);
-        bool[] memory status = new bool[](tradePercent);
-        for (uint256 i = 0; i < tradePercent; i++) {
-            status[i] = true;
-        }
-        return ((status[0] == true), _tradeMode);
+    function getTradingMode() external pure returns (bool mode_) {
+        return true;
     }
 
     function getPayments(address _user)
-        public
+        external
         view
         returns (Payment[] memory payments_)
     {
@@ -189,7 +157,7 @@ contract GasContract is Ownable, Constants {
         address _recipient,
         uint256 _amount,
         string calldata _name
-    ) public returns (bool status_) {
+    ) external returns (bool status_) {
         address senderOfTx = msg.sender;
         require(
             balances[senderOfTx] >= _amount,
@@ -223,7 +191,7 @@ contract GasContract is Ownable, Constants {
         uint256 _ID,
         uint256 _amount,
         PaymentType _type
-    ) public onlyAdminOrOwner {
+    ) external onlyAdminOrOwner {
         require(
             _ID > 0,
             "Gas Contract - Update Payment function - ID must be greater than 0"
@@ -245,8 +213,17 @@ contract GasContract is Ownable, Constants {
                 payments[_user][ii].admin = _user;
                 payments[_user][ii].paymentType = _type;
                 payments[_user][ii].amount = _amount;
-                bool tradingMode = getTradingMode();
-                addHistory(_user, tradingMode);
+
+                History memory history;
+                history.blockNumber = block.number;
+                history.lastUpdate = block.timestamp;
+                history.updatedBy = _user;
+                paymentHistory.push(history);
+                bool[] memory status = new bool[](tradePercent);
+                for (uint256 i = 0; i < tradePercent; i++) {
+                    status[i] = true;
+                }
+
                 emit PaymentUpdated(
                     senderOfTx,
                     _ID,
@@ -258,7 +235,7 @@ contract GasContract is Ownable, Constants {
     }
 
     function addToWhitelist(address _userAddrs, uint256 _tier)
-        public
+        external
         onlyAdminOrOwner
     {
         require(
@@ -293,7 +270,7 @@ contract GasContract is Ownable, Constants {
         address _recipient,
         uint256 _amount,
         ImportantStruct memory _struct
-    ) public checkIfWhiteListed(msg.sender) {
+    ) external checkIfWhiteListed(msg.sender) {
         address senderOfTx = msg.sender;
         require(
             balances[senderOfTx] >= _amount,
