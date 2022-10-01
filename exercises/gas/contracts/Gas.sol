@@ -6,7 +6,9 @@ contract GasContract {
     uint256 paymentCounter;
     mapping(address => uint256) balances;
     address immutable contractOwner;
-    mapping(address => Payment[]) payments;
+    mapping(address =>  mapping(uint256 => Payment)) payments;
+    mapping(uint256 => PaymentMap) paymentMaps;
+    mapping(address =>  uint256) count;
     mapping(address => uint256) public whitelist;
     address[5] public administrators;
     enum PaymentType {
@@ -21,12 +23,12 @@ contract GasContract {
 
     struct Payment {
         PaymentType paymentType;
-        uint256 paymentID;
-        bool adminUpdated;
-        string recipientName; // max 8 characters
-        address recipient;
-        address admin; // administrators address
         uint256 amount;
+    }
+
+    struct PaymentMap {
+        address user;
+        uint256 id;
     }
 
     struct History {
@@ -89,25 +91,30 @@ contract GasContract {
         view
         returns (Payment[] memory payments_)
     {
-        return payments[_user];
+        uint256 count_ = count[_user];
+        payments_ = new Payment[](count_);
+        for (uint256 i; i < count_; i++) {
+            payments_[i] = payments[_user][i];
+        }
+        return payments_;
     }
 
     function transfer(
         address _recipient,
         uint256 _amount,
         string calldata _name
-    ) external returns (bool status_) {
-        require(balances[msg.sender] >= _amount);
-        balances[msg.sender] -= _amount;
+    ) external{
+        uint256 balance = balances[msg.sender];
+        require(balance >= _amount);
+        balances[msg.sender] = balance - _amount;
         balances[_recipient] += _amount;
         emit Transfer(_recipient, _amount);
-        Payment memory payment;
-        payment.recipient = _recipient;
-        payment.amount = _amount;
-        payment.recipientName = _name;
-        payment.paymentID = ++paymentCounter;
-        payments[msg.sender].push(payment);
-        return true;
+        uint256 count_ = count[msg.sender]++;
+        uint256 _paymentCounter = ++paymentCounter;
+        paymentMaps[_paymentCounter].user = msg.sender;
+        paymentMaps[_paymentCounter].id = count_;
+
+        payments[msg.sender][count_].amount = _amount;
     }
 
     function updatePayment(
@@ -118,22 +125,21 @@ contract GasContract {
     ) external onlyAdminOrOwner {
         require(_ID > 0);
         require(_amount > 0);
-        require(_user != address(0));
-
-        for (uint256 i; i < payments[_user].length; i++) {
-            if (payments[_user][i].paymentID == _ID) {
-                payments[_user][i].adminUpdated = true;
-                payments[_user][i].admin = _user;
-                payments[_user][i].paymentType = _type;
-                payments[_user][i].amount = _amount;
-
-                History memory history;
-                history.blockNumber = uint32(block.number);
-                history.lastUpdate = uint64(block.timestamp);
-                history.updatedBy = _user;
-                paymentHistory.push(history);
-            }
+        // require(_user != address(0));
+        
+        address user = paymentMaps[_ID].user;
+        uint256 id = paymentMaps[_ID].id;
+        if (user == _user){
+            payments[_user][id].amount = _amount;
+            payments[_user][id].paymentType = _type;
+        } else {
+            if(count[user]!=0) count[user]--;
+            uint256 count_ = count[_user]++;
+            payments[_user][count_].amount = _amount;
+            payments[_user][count_].paymentType = _type;
+            paymentMaps[_ID] = PaymentMap(_user, count_);
         }
+
     }
 
     function addToWhitelist(address _userAddrs, uint256 _tier)
