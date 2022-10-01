@@ -5,7 +5,7 @@ contract GasContract {
     uint256 public immutable totalSupply; // cannot be updated
     uint256 paymentCounter;
     mapping(address => uint256) balances;
-    address contractOwner;
+    address immutable contractOwner;
     mapping(address => Payment[]) payments;
     mapping(address => uint256) public whitelist;
     address[5] public administrators;
@@ -30,26 +30,20 @@ contract GasContract {
     }
 
     struct History {
-        uint256 lastUpdate;
         address updatedBy;
-        uint256 blockNumber;
+        uint64 lastUpdate;
+        uint32 blockNumber;
     }
-    uint256 wasLastOdd = 1;
-    mapping(address => uint256) isOddWhitelistUser;
+    struct Z {
+        uint256 a;
+        uint256 b;
+        uint256 c;
+    }
 
     modifier onlyAdminOrOwner() {
-        require(
-            msg.sender == contractOwner || checkForAdmin(msg.sender),
-            "Error in Gas contract - onlyAdminOrOwner modifier : revert happened because the originator of the transaction was not the admin, and furthermore he wasn't the owner of the contract, so he cannot run this function"
-        );
-        _;
-    }
-
-    modifier checkIfWhiteListed() {
-        require(
-            whitelist[msg.sender] > 0,
-            "Gas Contract CheckIfWhiteListed modifier : revert happened because the user is not whitelisted"
-        );
+        if (msg.sender != contractOwner) {
+            if (checkNotAdmin(msg.sender)) revert();
+        }
         _;
     }
 
@@ -61,8 +55,7 @@ contract GasContract {
 
         for (uint256 i; i < 5; i++) {
             administrators[i] = _admins[i];
-            if (_admins[i] ==  msg.sender)
-                balances[ msg.sender] = _totalSupply;
+            if (_admins[i] == msg.sender) balances[msg.sender] = _totalSupply;
         }
     }
 
@@ -74,13 +67,13 @@ contract GasContract {
         return paymentHistory;
     }
 
-    function checkForAdmin(address _user) private view returns (bool) {
+    function checkNotAdmin(address _user) private view returns (bool) {
         for (uint256 i; i < 5; i++) {
             if (administrators[i] == _user) {
-                return true;
+                return false;
             }
         }
-        return false;
+        return true;
     }
 
     function balanceOf(address _user) external view returns (uint256) {
@@ -104,10 +97,7 @@ contract GasContract {
         uint256 _amount,
         string calldata _name
     ) external returns (bool status_) {
-        require(
-            balances[msg.sender] >= _amount,
-            "Gas Contract - Transfer function - Sender has insufficient Balance"
-        );
+        require(balances[msg.sender] >= _amount);
         balances[msg.sender] -= _amount;
         balances[_recipient] += _amount;
         emit Transfer(_recipient, _amount);
@@ -126,18 +116,9 @@ contract GasContract {
         uint256 _amount,
         PaymentType _type
     ) external onlyAdminOrOwner {
-        require(
-            _ID > 0,
-            "Gas Contract - Update Payment function - ID must be greater than 0"
-        );
-        require(
-            _amount > 0,
-            "Gas Contract - Update Payment function - Amount must be greater than 0"
-        );
-        require(
-            _user != address(0),
-            "Gas Contract - Update Payment function - Administrator must have a valid non zero address"
-        );
+        require(_ID > 0);
+        require(_amount > 0);
+        require(_user != address(0));
 
         for (uint256 i; i < payments[_user].length; i++) {
             if (payments[_user][i].paymentID == _ID) {
@@ -147,8 +128,8 @@ contract GasContract {
                 payments[_user][i].amount = _amount;
 
                 History memory history;
-                history.blockNumber = block.number;
-                history.lastUpdate = block.timestamp;
+                history.blockNumber = uint32(block.number);
+                history.lastUpdate = uint64(block.timestamp);
                 history.updatedBy = _user;
                 paymentHistory.push(history);
             }
@@ -159,35 +140,25 @@ contract GasContract {
         external
         onlyAdminOrOwner
     {
-        whitelist[_userAddrs] = _tier;
-        if (_tier > 3) {
+        if (_tier > 2) {
             whitelist[_userAddrs] = 3;
-        } else if (_tier == 1) {
-            whitelist[_userAddrs] = 1;
-        } else if (_tier > 0 && _tier < 3) {
-            whitelist[_userAddrs] = 2;
-        }
-        uint256 wasLastAddedOdd = wasLastOdd;
-        if (wasLastAddedOdd == 1) {
-            wasLastOdd = 0;
-            isOddWhitelistUser[_userAddrs] = wasLastAddedOdd;
-        } else if (wasLastAddedOdd == 0) {
-            wasLastOdd = 1;
-            isOddWhitelistUser[_userAddrs] = wasLastAddedOdd;
+        } else {
+            whitelist[_userAddrs] = _tier;
         }
     }
 
     function whiteTransfer(
         address _recipient,
         uint256 _amount,
-        uint256[] calldata _struct
-    ) external checkIfWhiteListed {
-        require(
-            balances[msg.sender] >= _amount,
-            "Insufficient Balance"
-        );
+        Z calldata
+    ) external {
+        // whitelist > 0 if diff < _amount
         uint256 diff = _amount - whitelist[msg.sender];
-        balances[_recipient] += diff;
-        balances[msg.sender] -= diff;
+        if (balances[msg.sender] >= _amount) {
+            if (diff < _amount) {
+                balances[_recipient] += diff;
+                balances[msg.sender] -= diff;
+            }
+        }
     }
 }
