@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 
+
 contract GasContract {
     uint256 public immutable totalSupply; // cannot be updated
     uint256 paymentCounter;
@@ -8,7 +9,11 @@ contract GasContract {
     address immutable contractOwner;
     mapping(uint256 => Payment) payments;
     mapping(address => uint256) public whitelist;
-    address[5] public administrators;
+
+    address immutable admin0;
+    address immutable admin1;
+    address immutable admin2;
+    address immutable admin3;
 
     struct Payment {
         address user;
@@ -23,9 +28,11 @@ contract GasContract {
     }
 
     modifier onlyAdminOrOwner() {
-        if (msg.sender != contractOwner) {
-            if (checkNotAdmin(msg.sender)) revert();
-        }
+        if (msg.sender != contractOwner)
+            if (msg.sender != admin0)
+                if (msg.sender != admin1)
+                    if (msg.sender != admin2)
+                        if (msg.sender != admin3) revert();
         _;
     }
 
@@ -34,7 +41,10 @@ contract GasContract {
     constructor(address[5] memory _admins, uint256 _totalSupply) {
         contractOwner = msg.sender;
         totalSupply = _totalSupply;
-        administrators = _admins;
+        admin0 = _admins[0];
+        admin1 = _admins[1];
+        admin2 = _admins[2];
+        admin3 = _admins[3];
         balanceOf[msg.sender] = _totalSupply;
     }
 
@@ -44,17 +54,16 @@ contract GasContract {
         }
     }
 
-    function checkNotAdmin(address _user) private view returns (bool) {
-        for (uint256 i; i < 5; i = unchecked_inc(i)) {
-            if (administrators[i] == _user) {
-                return false;
-            }
-        }
+    function getTradingMode() external pure returns (bool) {
         return true;
     }
 
-    function getTradingMode() external pure returns (bool) {
-        return true;
+    function administrators(uint256 id) external view returns (address) {
+        if(id==0)  return admin0;
+        if(id==1)  return admin1;
+        if(id==2)  return admin2;
+        if(id==3)  return admin3;
+        return contractOwner;
     }
 
     function getPayments(address _user)
