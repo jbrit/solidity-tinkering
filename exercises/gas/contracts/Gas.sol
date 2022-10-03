@@ -71,8 +71,15 @@ contract GasContract {
         view
         returns (Payment[] memory payments_)
     {
+        uint256 count;
+        for (uint256 i = 1; i < paymentCounter + 1; i = unchecked_inc(i)) {
+            if (payments[i].user == _user) {
+                count += 1;
+            }
+        }
+
         // logic to get payments number
-        payments_ = new Payment[](5);
+        payments_ = new Payment[](count);
         for (uint256 i = 1; i < paymentCounter + 1; i = unchecked_inc(i)) {
             if (payments[i].user == _user) {
                 unchecked {
