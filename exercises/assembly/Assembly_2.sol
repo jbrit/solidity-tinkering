@@ -1,4 +1,5 @@
-pragma solidity ^0.8.4;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.17;
 
 contract Add {
     function addAssembly(uint256 x, uint256 y) public pure returns (uint256) {
@@ -9,10 +10,11 @@ contract Add {
         // and return the result from the second block
         assembly {
             let result := add(x, y)
+            mstore(0, result)
         }
 
         assembly {
-            return()
+            return(0,0x20)
         }
     }
 }
