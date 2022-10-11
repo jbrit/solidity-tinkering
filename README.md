@@ -1,1 +1,3 @@
-# ExpertSolidityBootcamp
+# Solidity Deep Dive
+If you're here, I assume you have some familiarity with Ethereum smart contracts and the EVM.
+So, I'm just learning more about assembly, optimization, security, the regular stuff...
